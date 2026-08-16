@@ -16,6 +16,7 @@ export type Page = {
 export type SearchParams = {
   interpret?: string; // artist name
   title?: string; // song title
+  language?: string; // song language filter
   limit?: number; // max 100
   start?: number; // pagination offset
 };
@@ -94,6 +95,9 @@ const buildFormBody = (params: SearchParams): URLSearchParams => {
   }
   if (params.title && params.title.trim().length > 0) {
     form.set("title", params.title.trim());
+  }
+  if (params.language && params.language.trim().length > 0) {
+    form.set("language", params.language.trim());
   }
   form.set("limit", String(clampLimit(params.limit)));
   form.set("start", String(normalizeStart(params.start)));
