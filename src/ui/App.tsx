@@ -6,42 +6,64 @@ import { formatLanguageLabel } from "../api/usdb/languages.ts";
 import { type Page, type Song, searchSongs } from "../api/usdb/search.ts";
 import { checkYtDlpAvailable } from "../api/youtube/check.ts";
 import { warmupInnertube } from "../api/youtube/client.ts";
+import { useI18n } from "../i18n/I18nProvider.tsx";
+import {
+  type AppLocaleCode,
+  DEFAULT_LOCALE,
+  getUsdbLanguageForLocale,
+} from "../i18n/locales.ts";
 import { ytDlpInstallHint } from "../platform.ts";
 import { ensureSession } from "../session.ts";
+import { saveConfig } from "../storage/config.ts";
 import {
   appendDownloadedEntry,
   type DownloadedEntry,
   loadDownloadedEntries,
 } from "../storage/downloaded.ts";
 import DownloadedList from "./components/DownloadedList.tsx";
-import HelpRow from "./components/HelpRow.tsx";
+import HelpRow, { type Mode } from "./components/HelpRow.tsx";
 import LanguageSelect from "./components/LanguageSelect.tsx";
 import LoadingRow from "./components/LoadingRow.tsx";
+import LocaleSelect from "./components/LocaleSelect.tsx";
 import SearchForm, { type FocusedField } from "./components/SearchForm.tsx";
 import Select from "./components/Select.tsx";
+import SettingsScreen from "./components/SettingsScreen.tsx";
 import { downloadSong } from "./downloadSong.ts";
 
-type Mode = "form" | "results" | "language";
 type LanguageReturnMode = "form" | "results";
+
+export type AppProps = {
+  initialLocale: AppLocaleCode | null;
+};
 
 const nextFocusedField = (prev: FocusedField): FocusedField => {
   if (prev === "artist") return "title";
   if (prev === "title") return "language";
+  if (prev === "language") return "settings";
   return "artist";
 };
 
-export const App: FC = () => {
+export const App: FC<AppProps> = ({ initialLocale }) => {
   const { exit } = useApp();
+  const { t, locale, setLocale } = useI18n();
 
-  const [mode, setMode] = useState<Mode>("form");
+  const needsLocaleSetup = initialLocale === null;
+  const [mode, setMode] = useState<Mode>(
+    needsLocaleSetup ? "localeSetup" : "form",
+  );
   const [focusedField, setFocusedField] = useState<FocusedField>("artist");
   const [languageReturnMode, setLanguageReturnMode] =
     useState<LanguageReturnMode>("form");
 
   const [artist, setArtist] = useState<string>("");
   const [title, setTitle] = useState<string>("");
-  const [language, setLanguage] = useState<string>("");
+  const [language, setLanguage] = useState<string>(() =>
+    initialLocale ? getUsdbLanguageForLocale(initialLocale) : "",
+  );
   const [pendingLanguage, setPendingLanguage] = useState<string>("");
+  const [pendingLocale, setPendingLocale] = useState<AppLocaleCode>(
+    initialLocale ?? DEFAULT_LOCALE,
+  );
   const [limit] = useState<number>(20);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -110,6 +132,17 @@ export const App: FC = () => {
     void run();
   }, []);
 
+  const applyLocale = useCallback(
+    async (nextLocale: AppLocaleCode, syncSongLanguage: boolean) => {
+      await setLocale(nextLocale);
+      await Effect.runPromise(saveConfig({ locale: nextLocale }));
+      if (syncSongLanguage) {
+        setLanguage(getUsdbLanguageForLocale(nextLocale));
+      }
+    },
+    [setLocale],
+  );
+
   const fetchPage = useCallback(
     async (pageNumber: number, languageOverride?: string) => {
       if (!cookie) return;
@@ -169,6 +202,17 @@ export const App: FC = () => {
     setMode(languageReturnMode);
   }, [languageReturnMode]);
 
+  const confirmLocaleSetup = useCallback(async () => {
+    await applyLocale(pendingLocale, true);
+    setMode("form");
+    setFocusedField("artist");
+  }, [applyLocale, pendingLocale]);
+
+  const confirmSettingsLocale = useCallback(async () => {
+    await applyLocale(pendingLocale, true);
+    setMode("settings");
+  }, [applyLocale, pendingLocale]);
+
   const onSubmitSearch = useCallback(() => {
     void fetchPage(1);
   }, [fetchPage]);
@@ -178,11 +222,9 @@ export const App: FC = () => {
       const song = songs[index ?? selectedIndex];
       if (!song || !cookie) return;
 
-      // if already downloading this song, skip
       if (activeDownloads.some((d) => d.apiId === song.apiId)) return;
 
       setErrorMessage(null);
-      // add to active downloads
       setActiveDownloads((prev) => [
         ...prev,
         {
@@ -207,7 +249,6 @@ export const App: FC = () => {
           }),
         );
 
-        // persist downloaded entry
         try {
           const updated = await Effect.runPromise(
             appendDownloadedEntry({
@@ -225,7 +266,6 @@ export const App: FC = () => {
         const message = err instanceof Error ? err.message : String(err);
         setErrorMessage(message);
       } finally {
-        // remove from active downloads
         setActiveDownloads((prev) =>
           prev.filter((d) => d.apiId !== song.apiId),
         );
@@ -236,6 +276,19 @@ export const App: FC = () => {
 
   useInput((input, key) => {
     if (key.escape) {
+      if (mode === "localeSetup") {
+        exit();
+        return;
+      }
+      if (mode === "settingsLocale") {
+        setMode("settings");
+        return;
+      }
+      if (mode === "settings") {
+        setMode("form");
+        setFocusedField("settings");
+        return;
+      }
       if (mode === "language") {
         cancelLanguageSelect();
         return;
@@ -249,6 +302,7 @@ export const App: FC = () => {
         return;
       }
     }
+
     if (mode === "form") {
       if (key.tab) {
         setFocusedField(nextFocusedField);
@@ -259,7 +313,28 @@ export const App: FC = () => {
           openLanguageSelect("form");
           return;
         }
+        if (focusedField === "settings") {
+          setPendingLocale(locale);
+          setMode("settings");
+          return;
+        }
         onSubmitSearch();
+        return;
+      }
+    } else if (mode === "localeSetup") {
+      if (key.return) {
+        void confirmLocaleSetup();
+        return;
+      }
+    } else if (mode === "settings") {
+      if (key.return) {
+        setPendingLocale(locale);
+        setMode("settingsLocale");
+        return;
+      }
+    } else if (mode === "settingsLocale") {
+      if (key.return) {
+        void confirmSettingsLocale();
         return;
       }
     } else if (mode === "language") {
@@ -280,7 +355,6 @@ export const App: FC = () => {
         void fetchPage(currentPage);
         return;
       }
-      // Up/Down handled by Select component
       if (key.return && !isLoading) {
         void downloadSelectedSong();
         return;
@@ -298,58 +372,69 @@ export const App: FC = () => {
     }
   });
 
+  const showMainChrome = mode !== "localeSetup";
+
   return (
     <Box flexDirection="column" gap={1}>
       <Box>
         <Text color="magentaBright" bold underline>
-          UltraStar CLI
+          {t("app.title")}
         </Text>
       </Box>
 
-      {/* Status Row */}
-      <Box flexDirection="column">
-        <Text>
-          <Text color="white" bold>
-            Login:
-          </Text>{" "}
-          {cookie ? (
-            <Text color="greenBright">Logged in</Text>
-          ) : isInitializing ? (
-            <Text color="yellow">Checking…</Text>
-          ) : (
-            <Text color="red">Not logged in</Text>
-          )}
-        </Text>
-        {!isInitializing && !cookie && (
-          <Text color="red">
-            An unknown error occured. Please report on GitHub.
+      {showMainChrome && (
+        <Box flexDirection="column">
+          <Text>
+            <Text color="white" bold>
+              {t("status.login")}
+            </Text>{" "}
+            {cookie ? (
+              <Text color="greenBright">{t("status.loggedIn")}</Text>
+            ) : isInitializing ? (
+              <Text color="yellow">{t("status.checking")}</Text>
+            ) : (
+              <Text color="red">{t("status.notLoggedIn")}</Text>
+            )}
           </Text>
-        )}
-        <Text>
-          <Text color="white" bold>
-            Download:
-          </Text>{" "}
-          <Text color="greenBright">Native</Text>
-          <Text color="gray"> · yt-dlp fallback: </Text>
-          {ytAvailable == null ? (
-            <Text color="yellow">Checking…</Text>
-          ) : ytAvailable ? (
-            <Text color="greenBright">Available</Text>
-          ) : (
-            <Text>
-              <Text color="yellow">Not installed</Text>
-              <Text dimColor>
-                {" "}
-                ({ytDlpInstallHint()} See
-                https://github.com/yt-dlp/yt-dlp#installation)
-              </Text>
-            </Text>
+          {!isInitializing && !cookie && (
+            <Text color="red">{t("status.loginError")}</Text>
           )}
-        </Text>
-      </Box>
+          <Text>
+            <Text color="white" bold>
+              {t("status.download")}
+            </Text>{" "}
+            <Text color="greenBright">{t("status.native")}</Text>
+            <Text color="gray">{t("status.ytDlpFallback")}</Text>
+            {ytAvailable == null ? (
+              <Text color="yellow">{t("status.checking")}</Text>
+            ) : ytAvailable ? (
+              <Text color="greenBright">{t("status.available")}</Text>
+            ) : (
+              <Text>
+                <Text color="yellow">{t("status.notInstalled")}</Text>
+                <Text dimColor>
+                  {" "}
+                  ({ytDlpInstallHint()} See
+                  https://github.com/yt-dlp/yt-dlp#installation)
+                </Text>
+              </Text>
+            )}
+          </Text>
+        </Box>
+      )}
 
-      {isInitializing ? (
-        <LoadingRow label="Initializing session..." />
+      {mode === "localeSetup" ? (
+        <>
+          <LocaleSelect
+            value={pendingLocale}
+            onChange={setPendingLocale}
+            titleKey="localeSetup.subtitle"
+            showWelcome
+          />
+          <HelpRow mode={mode} canDownload />
+        </>
+      ) : isInitializing ? (
+        <LoadingRow label={t("loading.initializing")} />
       ) : (
         <>
           {mode === "form" && (
@@ -371,15 +456,21 @@ export const App: FC = () => {
             />
           )}
 
+          {mode === "settings" && <SettingsScreen />}
+
+          {mode === "settingsLocale" && (
+            <LocaleSelect value={pendingLocale} onChange={setPendingLocale} />
+          )}
+
           {mode === "results" && (
             <Box flexDirection="row">
               <Box flexDirection="column" width={"50%"}>
                 {isLoading ? (
-                  <LoadingRow label="Searching..." />
+                  <LoadingRow label={t("loading.searching")} />
                 ) : (
                   <>
                     {songs.length === 0 ? (
-                      <Text color="yellow">No results.</Text>
+                      <Text color="yellow">{t("results.noResults")}</Text>
                     ) : (
                       <Select
                         options={songs.map((s, i) => ({
@@ -413,13 +504,13 @@ export const App: FC = () => {
                     <Box>
                       <Text>
                         <Text color="white" bold>
-                          Page
+                          {t("results.page")}
                         </Text>{" "}
                         <Text color="cyanBright" bold>
                           {totalPages === 0 ? 0 : currentPage}
                         </Text>{" "}
                         <Text color="white" bold>
-                          of
+                          {t("results.of")}
                         </Text>{" "}
                         <Text color="cyanBright" bold>
                           {totalPages}
@@ -428,7 +519,7 @@ export const App: FC = () => {
                           <>
                             <Text color="gray"> · </Text>
                             <Text color="white" bold>
-                              Language:
+                              {t("results.language")}
                             </Text>{" "}
                             <Text color="magentaBright">
                               {formatLanguageLabel(language)}
@@ -438,7 +529,7 @@ export const App: FC = () => {
                       </Text>
                     </Box>
                     {canPaginate && (
-                      <Text dimColor>Use ←/→ to navigate pages</Text>
+                      <Text dimColor>{t("results.navigatePages")}</Text>
                     )}
                   </>
                 )}
@@ -459,7 +550,7 @@ export const App: FC = () => {
           {errorMessage && (
             <Text>
               <Text color="red" bold>
-                Error:
+                {t("error.label")}
               </Text>{" "}
               <Text color="red">{errorMessage}</Text>
             </Text>
