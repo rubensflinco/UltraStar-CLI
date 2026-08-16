@@ -4,6 +4,7 @@ import type { FC } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type Page, type Song, searchSongs } from "../api/usdb/search.ts";
 import { checkYtDlpAvailable } from "../api/youtube/check.ts";
+import { warmupInnertube } from "../api/youtube/client.ts";
 import { ytDlpInstallHint } from "../platform.ts";
 import { ensureSession } from "../session.ts";
 import {
@@ -79,7 +80,10 @@ export const App: FC = () => {
   useEffect(() => {
     let canceled = false;
     (async () => {
-      const ok = await Effect.runPromise(checkYtDlpAvailable);
+      const [ok] = await Promise.all([
+        Effect.runPromise(checkYtDlpAvailable),
+        warmupInnertube(),
+      ]);
       if (!canceled) setYtAvailable(ok);
     })();
     return () => {
@@ -136,10 +140,6 @@ export const App: FC = () => {
     async (index?: number) => {
       const song = songs[index ?? selectedIndex];
       if (!song || !cookie) return;
-      if (ytAvailable === false) {
-        setErrorMessage("yt-dlp is not installed. Downloading is disabled.");
-        return;
-      }
 
       // if already downloading this song, skip
       if (activeDownloads.some((d) => d.apiId === song.apiId)) return;
@@ -194,7 +194,7 @@ export const App: FC = () => {
         );
       }
     },
-    [songs, selectedIndex, cookie, activeDownloads, ytAvailable],
+    [songs, selectedIndex, cookie, activeDownloads],
   );
 
   useInput((input, key) => {
@@ -273,29 +273,25 @@ export const App: FC = () => {
         )}
         <Text>
           <Text color="white" bold>
-            yt-dlp:
+            Download:
           </Text>{" "}
+          <Text color="greenBright">Native</Text>
+          <Text color="gray"> · yt-dlp fallback: </Text>
           {ytAvailable == null ? (
             <Text color="yellow">Checking…</Text>
           ) : ytAvailable ? (
             <Text color="greenBright">Available</Text>
           ) : (
             <Text>
-              <Text color="red">Not installed.</Text>{" "}
+              <Text color="yellow">Not installed</Text>
               <Text dimColor>
-                {ytDlpInstallHint()} See
-                https://github.com/yt-dlp/yt-dlp#installation
+                {" "}
+                ({ytDlpInstallHint()} See
+                https://github.com/yt-dlp/yt-dlp#installation)
               </Text>
             </Text>
           )}
         </Text>
-        {ytAvailable === false && (
-          <Text>
-            <Text color="red" bold>
-              Downloading songs is not possible without yt-dlp.
-            </Text>
-          </Text>
-        )}
       </Box>
 
       {isInitializing ? (
@@ -396,7 +392,7 @@ export const App: FC = () => {
             </Text>
           )}
 
-          <HelpRow mode={mode} canDownload={ytAvailable !== false} />
+          <HelpRow mode={mode} canDownload />
         </>
       )}
     </Box>
