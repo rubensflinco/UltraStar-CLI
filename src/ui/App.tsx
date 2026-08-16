@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { Box, Text, useApp, useInput } from "ink";
 import type { FC } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatLanguageLabel } from "../api/usdb/languages.ts";
 import { type Page, type Song, searchSongs } from "../api/usdb/search.ts";
 import { checkYtDlpAvailable } from "../api/youtube/check.ts";
 import { warmupInnertube } from "../api/youtube/client.ts";
@@ -14,23 +15,33 @@ import {
 } from "../storage/downloaded.ts";
 import DownloadedList from "./components/DownloadedList.tsx";
 import HelpRow from "./components/HelpRow.tsx";
+import LanguageSelect from "./components/LanguageSelect.tsx";
 import LoadingRow from "./components/LoadingRow.tsx";
-import SearchForm from "./components/SearchForm.tsx";
+import SearchForm, { type FocusedField } from "./components/SearchForm.tsx";
 import Select from "./components/Select.tsx";
 import { downloadSong } from "./downloadSong.ts";
 
-type Mode = "form" | "results";
+type Mode = "form" | "results" | "language";
+type LanguageReturnMode = "form" | "results";
+
+const nextFocusedField = (prev: FocusedField): FocusedField => {
+  if (prev === "artist") return "title";
+  if (prev === "title") return "language";
+  return "artist";
+};
 
 export const App: FC = () => {
   const { exit } = useApp();
 
   const [mode, setMode] = useState<Mode>("form");
-  const [focusedField, setFocusedField] = useState<"artist" | "title">(
-    "artist",
-  );
+  const [focusedField, setFocusedField] = useState<FocusedField>("artist");
+  const [languageReturnMode, setLanguageReturnMode] =
+    useState<LanguageReturnMode>("form");
 
   const [artist, setArtist] = useState<string>("");
   const [title, setTitle] = useState<string>("");
+  const [language, setLanguage] = useState<string>("");
+  const [pendingLanguage, setPendingLanguage] = useState<string>("");
   const [limit] = useState<number>(20);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -100,17 +111,20 @@ export const App: FC = () => {
   }, []);
 
   const fetchPage = useCallback(
-    async (pageNumber: number) => {
+    async (pageNumber: number, languageOverride?: string) => {
       if (!cookie) return;
       setIsLoading(true);
       setErrorMessage(null);
       try {
         const pageStart = (pageNumber - 1) * limit;
+        const languageFilter =
+          languageOverride !== undefined ? languageOverride : language;
         const page: Page = await Effect.runPromise(
           searchSongs(
             {
               interpret: artist.trim() || undefined,
               title: title.trim() || undefined,
+              language: languageFilter.trim() || undefined,
               limit,
               start: pageStart,
             },
@@ -129,8 +143,31 @@ export const App: FC = () => {
         setIsLoading(false);
       }
     },
-    [artist, title, cookie, limit],
+    [artist, title, language, cookie, limit],
   );
+
+  const openLanguageSelect = useCallback(
+    (returnMode: LanguageReturnMode) => {
+      setLanguageReturnMode(returnMode);
+      setPendingLanguage(language);
+      setMode("language");
+    },
+    [language],
+  );
+
+  const confirmLanguageSelect = useCallback(() => {
+    setLanguage(pendingLanguage);
+    if (languageReturnMode === "results") {
+      void fetchPage(1, pendingLanguage);
+      return;
+    }
+    setMode("form");
+    setFocusedField("artist");
+  }, [pendingLanguage, languageReturnMode, fetchPage]);
+
+  const cancelLanguageSelect = useCallback(() => {
+    setMode(languageReturnMode);
+  }, [languageReturnMode]);
 
   const onSubmitSearch = useCallback(() => {
     void fetchPage(1);
@@ -199,6 +236,10 @@ export const App: FC = () => {
 
   useInput((input, key) => {
     if (key.escape) {
+      if (mode === "language") {
+        cancelLanguageSelect();
+        return;
+      }
       if (mode === "results") {
         setMode("form");
         return;
@@ -210,16 +251,29 @@ export const App: FC = () => {
     }
     if (mode === "form") {
       if (key.tab) {
-        setFocusedField((prev) => (prev === "artist" ? "title" : "artist"));
+        setFocusedField(nextFocusedField);
         return;
       }
       if (key.return) {
+        if (focusedField === "language") {
+          openLanguageSelect("form");
+          return;
+        }
         onSubmitSearch();
+        return;
+      }
+    } else if (mode === "language") {
+      if (key.return) {
+        confirmLanguageSelect();
         return;
       }
     } else if (mode === "results") {
       if (input === "e") {
         setMode("form");
+        return;
+      }
+      if (input === "l") {
+        openLanguageSelect("results");
         return;
       }
       if (input === "r") {
@@ -302,10 +356,18 @@ export const App: FC = () => {
             <SearchForm
               artist={artist}
               title={title}
+              language={language}
               limit={limit}
               focusedField={focusedField}
               setArtist={setArtist}
               setTitle={setTitle}
+            />
+          )}
+
+          {mode === "language" && (
+            <LanguageSelect
+              value={pendingLanguage}
+              onChange={setPendingLanguage}
             />
           )}
 
@@ -362,6 +424,17 @@ export const App: FC = () => {
                         <Text color="cyanBright" bold>
                           {totalPages}
                         </Text>
+                        {language ? (
+                          <>
+                            <Text color="gray"> · </Text>
+                            <Text color="white" bold>
+                              Language:
+                            </Text>{" "}
+                            <Text color="magentaBright">
+                              {formatLanguageLabel(language)}
+                            </Text>
+                          </>
+                        ) : null}
                       </Text>
                     </Box>
                     {canPaginate && (
