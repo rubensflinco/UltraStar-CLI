@@ -4,6 +4,7 @@ import {
   formatLanguageLabel,
   USDB_LANGUAGES,
 } from "../../api/usdb/languages.ts";
+import { useI18n } from "../../i18n/I18nProvider.tsx";
 import Select from "./Select.tsx";
 
 export type LanguageSelectProps = {
@@ -15,8 +16,10 @@ export const LanguageSelect: FC<LanguageSelectProps> = ({
   value,
   onChange,
 }) => {
+  const { t } = useI18n();
+
   const options = [
-    { label: "Any", value: "" },
+    { label: t("language.any"), value: "" },
     ...USDB_LANGUAGES.map((lang) => ({
       label: formatLanguageLabel(lang),
       value: lang,
@@ -26,7 +29,7 @@ export const LanguageSelect: FC<LanguageSelectProps> = ({
   return (
     <Box flexDirection="column" gap={1}>
       <Text color="white" bold>
-        Select language
+        {t("language.selectSongLanguage")}
       </Text>
       <Select
         options={options}

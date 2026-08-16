@@ -2,8 +2,9 @@ import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import type { FC } from "react";
 import { formatLanguageLabel } from "../../api/usdb/languages.ts";
+import { useI18n } from "../../i18n/I18nProvider.tsx";
 
-export type FocusedField = "artist" | "title" | "language";
+export type FocusedField = "artist" | "title" | "language" | "settings";
 
 export type SearchFormProps = {
   artist: string;
@@ -23,45 +24,53 @@ export const SearchForm: FC<SearchFormProps> = ({
   setArtist,
   setTitle,
 }) => {
+  const { t } = useI18n();
   const languageLabel = language
     ? formatLanguageLabel(language)
-    : "Any";
+    : t("language.any");
+
+  const hint =
+    focusedField === "language"
+      ? t("form.pressEnterLanguage")
+      : focusedField === "settings"
+        ? t("form.pressEnterSettings")
+        : t("form.pressEnterSearch");
 
   return (
     <Box flexDirection="column" gap={1}>
       <Box>
-        <Box width={10}>
+        <Box width={12}>
           <Text color="white" bold>
-            Artist:
+            {t("form.artist")}
           </Text>
         </Box>
         <TextInput
           value={artist}
           onChange={setArtist}
           focus={focusedField === "artist"}
-          placeholder="e.g. Queen"
+          placeholder={t("form.artistPlaceholder")}
         />
       </Box>
       <Box>
-        <Box width={10}>
+        <Box width={12}>
           <Text color="white" bold>
-            Title:
+            {t("form.title")}
           </Text>
         </Box>
         <TextInput
           value={title}
           onChange={setTitle}
           focus={focusedField === "title"}
-          placeholder="e.g. Bohemian Rhapsody"
+          placeholder={t("form.titlePlaceholder")}
         />
       </Box>
       <Box>
-        <Box width={10}>
+        <Box width={12}>
           <Text
             color={focusedField === "language" ? "cyanBright" : "white"}
             bold
           >
-            Language:
+            {t("form.language")}
           </Text>
         </Box>
         <Text
@@ -71,15 +80,29 @@ export const SearchForm: FC<SearchFormProps> = ({
           {focusedField === "language" ? `> ${languageLabel}` : languageLabel}
         </Text>
         {focusedField === "language" && (
-          <Text dimColor>{"  "}(Enter to select)</Text>
+          <Text dimColor>
+            {"  "}
+            {t("form.enterToSelect")}
+          </Text>
         )}
       </Box>
-      <Box>
-        <Text color="green">
-          {focusedField === "language"
-            ? "Press Enter to select language"
-            : "Press Enter to search"}
+
+      <Box marginTop={2}>
+        <Text color={focusedField === "settings" ? "cyanBright" : "white"} bold>
+          {focusedField === "settings"
+            ? `> ${t("form.settings")}`
+            : t("form.settings")}
         </Text>
+        {focusedField === "settings" && (
+          <Text dimColor>
+            {"  "}
+            {t("form.enterToSelect")}
+          </Text>
+        )}
+      </Box>
+
+      <Box>
+        <Text color="green">{hint}</Text>
       </Box>
     </Box>
   );

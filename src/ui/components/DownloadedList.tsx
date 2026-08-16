@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import type { FC } from "react";
+import { useI18n } from "../../i18n/I18nProvider.tsx";
 import type { DownloadedEntry } from "../../storage/downloaded.ts";
 import ProgressBar from "./ProgressBar.tsx";
 
@@ -16,10 +17,12 @@ export const DownloadedList: FC<DownloadedListProps> = ({
   entries,
   currentDownloading,
 }) => {
+  const { t } = useI18n();
+
   return (
     <Box flexDirection="column">
       <Text color="magenta" bold>
-        Recently downloaded
+        {t("downloaded.recentlyDownloaded")}
       </Text>
       {currentDownloading && currentDownloading.length > 0 && (
         <Box flexDirection="column" marginBottom={1}>

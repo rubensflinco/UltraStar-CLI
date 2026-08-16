@@ -1,50 +1,38 @@
 import { Text } from "ink";
 import type { FC } from "react";
+import { useI18n } from "../../i18n/I18nProvider.tsx";
 
-export type Mode = "form" | "results" | "language";
+export type Mode =
+  | "form"
+  | "results"
+  | "language"
+  | "localeSetup"
+  | "settings"
+  | "settingsLocale";
 
 export const HelpRow: FC<{ mode: Mode; canDownload?: boolean }> = ({
   mode,
   canDownload = true,
 }) => {
-  if (mode === "form") {
-    return (
-      <Text>
-        <Text color="white" bold>
-          Tips:
-        </Text>{" "}
-        <Text dimColor>
-          Tab: switch field • Enter: search / select language • Esc: quit
-        </Text>
-      </Text>
-    );
+  const { t } = useI18n();
+
+  let tip = t("help.form");
+  if (mode === "language" || mode === "settingsLocale") {
+    tip = t("help.language");
+  } else if (mode === "localeSetup") {
+    tip = t("help.localeSetup");
+  } else if (mode === "settings") {
+    tip = t("help.settings");
+  } else if (mode === "results") {
+    tip = canDownload ? t("help.results") : t("help.resultsNoDownload");
   }
-  if (mode === "language") {
-    return (
-      <Text>
-        <Text color="white" bold>
-          Tips:
-        </Text>{" "}
-        <Text dimColor>↑/↓: select • Enter: confirm • Esc: cancel</Text>
-      </Text>
-    );
-  }
+
   return (
     <Text>
       <Text color="white" bold>
-        Tips:
+        {t("help.tips")}
       </Text>{" "}
-      {canDownload ? (
-        <Text dimColor>
-          ↑/↓: select • Enter: download • ←/→: page • e: edit search • l:
-          language • r: refresh • Esc: back
-        </Text>
-      ) : (
-        <Text dimColor>
-          ↑/↓: select • ←/→: page • e: edit search • l: language • r: refresh •
-          Esc: back
-        </Text>
-      )}
+      <Text dimColor>{tip}</Text>
     </Text>
   );
 };
