@@ -1,11 +1,14 @@
+import { join } from "node:path";
 import { Effect } from "effect";
 import { Box, Text, useApp, useInput } from "ink";
 import type { FC } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_TARGET_PEAK_DB } from "../api/audio/normalize.ts";
 import { formatLanguageLabel } from "../api/usdb/languages.ts";
 import { type Page, type Song, searchSongs } from "../api/usdb/search.ts";
 import { checkYtDlpAvailable } from "../api/youtube/check.ts";
 import { warmupInnertube } from "../api/youtube/client.ts";
+import { checkFfmpegAvailable } from "../api/youtube/ffmpeg.ts";
 import { useI18n } from "../i18n/I18nProvider.tsx";
 import {
   type AppLocaleCode,
@@ -14,7 +17,10 @@ import {
 } from "../i18n/locales.ts";
 import { ytDlpInstallHint } from "../platform.ts";
 import { ensureSession } from "../session.ts";
-import { saveConfig } from "../storage/config.ts";
+import {
+  parseTargetPeakDb,
+  saveConfig,
+} from "../storage/config.ts";
 import {
   appendDownloadedEntry,
   type DownloadedEntry,
@@ -25,25 +31,38 @@ import HelpRow, { type Mode } from "./components/HelpRow.tsx";
 import LanguageSelect from "./components/LanguageSelect.tsx";
 import LoadingRow from "./components/LoadingRow.tsx";
 import LocaleSelect from "./components/LocaleSelect.tsx";
+import NormalizeVolumesScreen from "./components/NormalizeVolumesScreen.tsx";
 import SearchForm, { type FocusedField } from "./components/SearchForm.tsx";
 import Select from "./components/Select.tsx";
-import SettingsScreen from "./components/SettingsScreen.tsx";
+import SettingsScreen, {
+  type SettingsFocusedField,
+} from "./components/SettingsScreen.tsx";
 import { downloadSong } from "./downloadSong.ts";
+import { normalizeAllSongs } from "./normalizeSongs.ts";
 
 type LanguageReturnMode = "form" | "results";
 
 export type AppProps = {
   initialLocale: AppLocaleCode | null;
+  initialTargetPeakDb?: number;
 };
 
 const nextFocusedField = (prev: FocusedField): FocusedField => {
   if (prev === "artist") return "title";
   if (prev === "title") return "language";
-  if (prev === "language") return "settings";
+  if (prev === "language") return "normalize";
+  if (prev === "normalize") return "settings";
   return "artist";
 };
 
-export const App: FC<AppProps> = ({ initialLocale }) => {
+const nextSettingsField = (
+  prev: SettingsFocusedField,
+): SettingsFocusedField => (prev === "locale" ? "targetPeakDb" : "locale");
+
+export const App: FC<AppProps> = ({
+  initialLocale,
+  initialTargetPeakDb = DEFAULT_TARGET_PEAK_DB,
+}) => {
   const { exit } = useApp();
   const { t, locale, setLocale } = useI18n();
 
@@ -52,6 +71,8 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
     needsLocaleSetup ? "localeSetup" : "form",
   );
   const [focusedField, setFocusedField] = useState<FocusedField>("artist");
+  const [settingsFocusedField, setSettingsFocusedField] =
+    useState<SettingsFocusedField>("locale");
   const [languageReturnMode, setLanguageReturnMode] =
     useState<LanguageReturnMode>("form");
 
@@ -63,6 +84,10 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
   const [pendingLanguage, setPendingLanguage] = useState<string>("");
   const [pendingLocale, setPendingLocale] = useState<AppLocaleCode>(
     initialLocale ?? DEFAULT_LOCALE,
+  );
+  const [targetPeakDb, setTargetPeakDb] = useState<number>(initialTargetPeakDb);
+  const [targetPeakDbDraft, setTargetPeakDbDraft] = useState<string>(
+    String(initialTargetPeakDb),
   );
   const [limit] = useState<number>(20);
 
@@ -85,6 +110,18 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
   const [downloadedEntries, setDownloadedEntries] = useState<DownloadedEntry[]>(
     [],
   );
+  const [isNormalizing, setIsNormalizing] = useState(false);
+  const [normalizeProgress, setNormalizeProgress] = useState<{
+    current: number;
+    total: number;
+    dirName: string;
+    percent: number;
+  } | null>(null);
+  const [normalizeSummary, setNormalizeSummary] = useState<{
+    succeeded: number;
+    skipped: number;
+    failed: number;
+  } | null>(null);
 
   const canPaginate = useMemo(() => totalPages > 1, [totalPages]);
 
@@ -142,6 +179,21 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
     },
     [setLocale],
   );
+
+  const persistTargetPeakDb = useCallback(async (raw: string) => {
+    const next = parseTargetPeakDb(raw);
+    setTargetPeakDb(next);
+    setTargetPeakDbDraft(String(next));
+    await Effect.runPromise(saveConfig({ targetPeakDb: next }));
+    return next;
+  }, []);
+
+  const openSettings = useCallback(() => {
+    setSettingsFocusedField("locale");
+    setTargetPeakDbDraft(String(targetPeakDb));
+    setPendingLocale(locale);
+    setMode("settings");
+  }, [locale, targetPeakDb]);
 
   const fetchPage = useCallback(
     async (pageNumber: number, languageOverride?: string) => {
@@ -217,6 +269,40 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
     void fetchPage(1);
   }, [fetchPage]);
 
+  const runBatchNormalize = useCallback(async () => {
+    if (isNormalizing) return;
+    setErrorMessage(null);
+    setNormalizeSummary(null);
+    setNormalizeProgress(null);
+    setIsNormalizing(true);
+    try {
+      const ffmpegOk = await Effect.runPromise(checkFfmpegAvailable);
+      if (!ffmpegOk) {
+        throw new Error(
+          "ffmpeg not available (ffmpeg-static install may have failed)",
+        );
+      }
+      const baseDir = join(process.cwd(), "songs");
+      const result = await Effect.runPromise(
+        normalizeAllSongs(
+          baseDir,
+          (p) => setNormalizeProgress(p),
+          targetPeakDb,
+        ),
+      );
+      setNormalizeSummary({
+        succeeded: result.succeeded,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setErrorMessage(message);
+    } finally {
+      setIsNormalizing(false);
+    }
+  }, [isNormalizing, targetPeakDb]);
+
   const downloadSelectedSong = useCallback(
     async (index?: number) => {
       const song = songs[index ?? selectedIndex];
@@ -240,6 +326,7 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
           downloadSong({
             song,
             cookie,
+            targetPeakDb,
             onProgress: (p) =>
               setActiveDownloads((prev) =>
                 prev.map((d) =>
@@ -271,7 +358,7 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
         );
       }
     },
-    [songs, selectedIndex, cookie, activeDownloads],
+    [songs, selectedIndex, cookie, activeDownloads, targetPeakDb],
   );
 
   useInput((input, key) => {
@@ -285,8 +372,18 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
         return;
       }
       if (mode === "settings") {
+        void persistTargetPeakDb(targetPeakDbDraft).finally(() => {
+          setMode("form");
+          setFocusedField("settings");
+        });
+        return;
+      }
+      if (mode === "normalize") {
+        if (isNormalizing) return;
         setMode("form");
-        setFocusedField("settings");
+        setFocusedField("normalize");
+        setNormalizeProgress(null);
+        setNormalizeSummary(null);
         return;
       }
       if (mode === "language") {
@@ -313,9 +410,14 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
           openLanguageSelect("form");
           return;
         }
+        if (focusedField === "normalize") {
+          setNormalizeProgress(null);
+          setNormalizeSummary(null);
+          setMode("normalize");
+          return;
+        }
         if (focusedField === "settings") {
-          setPendingLocale(locale);
-          setMode("settings");
+          openSettings();
           return;
         }
         onSubmitSearch();
@@ -326,10 +428,23 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
         void confirmLocaleSetup();
         return;
       }
+    } else if (mode === "normalize") {
+      if (key.return && !isNormalizing && !normalizeSummary) {
+        void runBatchNormalize();
+        return;
+      }
     } else if (mode === "settings") {
+      if (key.tab || key.upArrow || key.downArrow) {
+        setSettingsFocusedField(nextSettingsField);
+        return;
+      }
       if (key.return) {
-        setPendingLocale(locale);
-        setMode("settingsLocale");
+        if (settingsFocusedField === "locale") {
+          setPendingLocale(locale);
+          setMode("settingsLocale");
+          return;
+        }
+        void persistTargetPeakDb(targetPeakDbDraft);
         return;
       }
     } else if (mode === "settingsLocale") {
@@ -456,7 +571,22 @@ export const App: FC<AppProps> = ({ initialLocale }) => {
             />
           )}
 
-          {mode === "settings" && <SettingsScreen />}
+          {mode === "settings" && (
+            <SettingsScreen
+              focusedField={settingsFocusedField}
+              targetPeakDbDraft={targetPeakDbDraft}
+              onTargetPeakDbDraftChange={setTargetPeakDbDraft}
+            />
+          )}
+
+          {mode === "normalize" && (
+            <NormalizeVolumesScreen
+              isRunning={isNormalizing}
+              progress={normalizeProgress}
+              summary={normalizeSummary}
+              targetPeakDb={targetPeakDb}
+            />
+          )}
 
           {mode === "settingsLocale" && (
             <LocaleSelect value={pendingLocale} onChange={setPendingLocale} />

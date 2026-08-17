@@ -8,7 +8,8 @@ export type Mode =
   | "language"
   | "localeSetup"
   | "settings"
-  | "settingsLocale";
+  | "settingsLocale"
+  | "normalize";
 
 export const HelpRow: FC<{ mode: Mode; canDownload?: boolean }> = ({
   mode,
@@ -23,6 +24,8 @@ export const HelpRow: FC<{ mode: Mode; canDownload?: boolean }> = ({
     tip = t("help.localeSetup");
   } else if (mode === "settings") {
     tip = t("help.settings");
+  } else if (mode === "normalize") {
+    tip = t("help.normalize");
   } else if (mode === "results") {
     tip = canDownload ? t("help.results") : t("help.resultsNoDownload");
   }

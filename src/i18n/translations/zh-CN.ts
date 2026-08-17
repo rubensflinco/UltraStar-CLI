@@ -24,12 +24,14 @@ export const zhCN: TranslationSchema = {
     artist: "歌手:",
     title: "标题:",
     language: "语言:",
+    normalizeVolumes: "平衡音量",
     settings: "设置",
     artistPlaceholder: "例如: Queen",
     titlePlaceholder: "例如: Bohemian Rhapsody",
     enterToSelect: "(按 Enter 选择)",
     pressEnterSearch: "按 Enter 搜索",
     pressEnterLanguage: "按 Enter 选择语言",
+    pressEnterNormalize: "按 Enter 平衡所有歌曲音量",
     pressEnterSettings: "按 Enter 打开设置",
   },
   language: {
@@ -50,7 +52,25 @@ export const zhCN: TranslationSchema = {
   settings: {
     title: "设置",
     appLanguage: "应用语言:",
-    changeHint: "按 Enter 更改语言",
+    targetPeakDb: "目标峰值:",
+    targetPeakDbPlaceholder: "例如: -3",
+    targetPeakDbHint:
+      "峰值音量目标（dB）（{{min}} 至 {{max}}）。默认为 -3（仪表黄色区域）。",
+    changeLanguageHint: "按 Enter 更改语言",
+    editPeakHint: "编辑数值后按 Enter 保存",
+    backHint: "Tab: 切换设置 • Esc: 保存并返回",
+  },
+  normalize: {
+    title: "平衡音量",
+    description:
+      "从每个 video.mp4 创建 audio.mp3，并将峰值归一化到 {{peak}} dB（仪表黄色区域）。video.mp4 保持不变。",
+    pressEnter: "按 Enter 处理 songs 文件夹中的所有歌曲",
+    running: "正在平衡音量…",
+    noneFound: "未找到包含 video.mp4 的歌曲。",
+    done: "音量平衡已完成。",
+    succeeded: "完成:",
+    skipped: "跳过:",
+    failed: "失败:",
     backHint: "按 Esc 返回",
   },
   localeSetup: {
@@ -62,7 +82,8 @@ export const zhCN: TranslationSchema = {
     form: "Tab: 切换字段 • Enter: 搜索 / 选择 • Esc: 退出",
     language: "↑/↓: 选择 • Enter: 确认 • Esc: 取消",
     localeSetup: "↑/↓: 选择 • Enter: 确认",
-    settings: "Enter: 更改语言 • Esc: 返回",
+    settings: "Tab: 切换设置 • Enter: 编辑 / 确认 • Esc: 保存并返回",
+    normalize: "Enter: 开始 • Esc: 返回",
     results:
       "↑/↓: 选择 • Enter: 下载 • ←/→: 翻页 • e: 编辑搜索 • l: 语言 • r: 刷新 • Esc: 返回",
     resultsNoDownload:
