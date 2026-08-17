@@ -24,12 +24,14 @@ export const ptBR: TranslationSchema = {
     artist: "Artista:",
     title: "Título:",
     language: "Idioma:",
+    normalizeVolumes: "Equilibrar volumes",
     settings: "Configurações",
     artistPlaceholder: "ex.: Queen",
     titlePlaceholder: "ex.: Bohemian Rhapsody",
     enterToSelect: "(Enter para selecionar)",
     pressEnterSearch: "Pressione Enter para buscar",
     pressEnterLanguage: "Pressione Enter para selecionar o idioma",
+    pressEnterNormalize: "Pressione Enter para equilibrar o volume de todas as músicas",
     pressEnterSettings: "Pressione Enter para abrir as configurações",
   },
   language: {
@@ -50,7 +52,25 @@ export const ptBR: TranslationSchema = {
   settings: {
     title: "Configurações",
     appLanguage: "Idioma do app:",
-    changeHint: "Pressione Enter para mudar o idioma",
+    targetPeakDb: "Pico alvo:",
+    targetPeakDbPlaceholder: "ex.: -3",
+    targetPeakDbHint:
+      "Alvo de volume de pico em dB ({{min}} a {{max}}). O padrão é -3 (zona amarela do medidor).",
+    changeLanguageHint: "Pressione Enter para mudar o idioma",
+    editPeakHint: "Edite o valor e pressione Enter para salvar",
+    backHint: "Tab: trocar configuração • Esc: salvar e voltar",
+  },
+  normalize: {
+    title: "Equilibrar volumes",
+    description:
+      "Cria audio.mp3 a partir de cada video.mp4 e normaliza o pico para {{peak}} dB (zona amarela do medidor). O video.mp4 permanece inalterado.",
+    pressEnter: "Pressione Enter para processar todas as músicas na pasta songs",
+    running: "Equilibrando volumes…",
+    noneFound: "Nenhuma música com video.mp4 encontrada.",
+    done: "Equilíbrio de volumes concluído.",
+    succeeded: "Concluído:",
+    skipped: "Ignorado:",
+    failed: "Falhou:",
     backHint: "Pressione Esc para voltar",
   },
   localeSetup: {
@@ -62,7 +82,8 @@ export const ptBR: TranslationSchema = {
     form: "Tab: trocar campo • Enter: buscar / selecionar • Esc: sair",
     language: "↑/↓: selecionar • Enter: confirmar • Esc: cancelar",
     localeSetup: "↑/↓: selecionar • Enter: confirmar",
-    settings: "Enter: mudar idioma • Esc: voltar",
+    settings: "Tab: trocar configuração • Enter: editar / confirmar • Esc: salvar e voltar",
+    normalize: "Enter: iniciar • Esc: voltar",
     results:
       "↑/↓: selecionar • Enter: baixar • ←/→: página • e: editar busca • l: idioma • r: atualizar • Esc: voltar",
     resultsNoDownload:

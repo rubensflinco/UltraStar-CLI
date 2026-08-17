@@ -24,12 +24,14 @@ export const ptPT: TranslationSchema = {
     artist: "Artista:",
     title: "Título:",
     language: "Idioma:",
+    normalizeVolumes: "Equilibrar volumes",
     settings: "Definições",
     artistPlaceholder: "ex.: Queen",
     titlePlaceholder: "ex.: Bohemian Rhapsody",
     enterToSelect: "(Enter para selecionar)",
     pressEnterSearch: "Prima Enter para pesquisar",
     pressEnterLanguage: "Prima Enter para selecionar o idioma",
+    pressEnterNormalize: "Prima Enter para equilibrar o volume de todas as músicas",
     pressEnterSettings: "Prima Enter para abrir as definições",
   },
   language: {
@@ -50,7 +52,25 @@ export const ptPT: TranslationSchema = {
   settings: {
     title: "Definições",
     appLanguage: "Idioma da aplicação:",
-    changeHint: "Prima Enter para alterar o idioma",
+    targetPeakDb: "Pico alvo:",
+    targetPeakDbPlaceholder: "ex.: -3",
+    targetPeakDbHint:
+      "Alvo de volume de pico em dB ({{min}} a {{max}}). O predefinido é -3 (zona amarela do medidor).",
+    changeLanguageHint: "Prima Enter para alterar o idioma",
+    editPeakHint: "Edite o valor e prima Enter para guardar",
+    backHint: "Tab: mudar definição • Esc: guardar e voltar",
+  },
+  normalize: {
+    title: "Equilibrar volumes",
+    description:
+      "Cria audio.mp3 a partir de cada video.mp4 e normaliza o pico para {{peak}} dB (zona amarela do medidor). O video.mp4 permanece inalterado.",
+    pressEnter: "Prima Enter para processar todas as músicas na pasta songs",
+    running: "A equilibrar volumes…",
+    noneFound: "Nenhuma música com video.mp4 encontrada.",
+    done: "Equilíbrio de volumes concluído.",
+    succeeded: "Concluído:",
+    skipped: "Ignorado:",
+    failed: "Falhou:",
     backHint: "Prima Esc para voltar",
   },
   localeSetup: {
@@ -62,7 +82,8 @@ export const ptPT: TranslationSchema = {
     form: "Tab: mudar campo • Enter: pesquisar / selecionar • Esc: sair",
     language: "↑/↓: selecionar • Enter: confirmar • Esc: cancelar",
     localeSetup: "↑/↓: selecionar • Enter: confirmar",
-    settings: "Enter: alterar idioma • Esc: voltar",
+    settings: "Tab: mudar definição • Enter: editar / confirmar • Esc: guardar e voltar",
+    normalize: "Enter: iniciar • Esc: voltar",
     results:
       "↑/↓: selecionar • Enter: transferir • ←/→: página • e: editar pesquisa • l: idioma • r: atualizar • Esc: voltar",
     resultsNoDownload:

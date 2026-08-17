@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Effect } from "effect";
+import { normalizeSongDirectory } from "../api/audio/normalize.ts";
 import { downloadCoverById } from "../api/usdb/cover.ts";
 import { getLyricsById } from "../api/usdb/lyrics.ts";
 import type { Song } from "../api/usdb/search.ts";
@@ -14,6 +15,7 @@ export type DownloadSongParams = {
   song: Song;
   cookie: string;
   baseDir?: string; // defaults to CWD/songs
+  targetPeakDb?: number;
   onProgress?: (p: number) => void; // 0..1
 };
 
@@ -62,7 +64,7 @@ const downloadVideoFromLinks = (
         tried.add(link);
         const result = yield* Effect.either(
           downloadYoutubeVideoWithProgress(link, outputPath, (p) =>
-            onProgress?.(p.percent ?? 0),
+            onProgress?.(Math.min(0.92, p.percent ?? 0)),
           ),
         );
         if (result._tag === "Right") return true;
@@ -138,7 +140,7 @@ export const downloadSong = (
       if (!parsed) return;
       const headers = {
         ...parsed.headers,
-        mp3: "video.mp4",
+        mp3: "audio.mp3",
         video: "video.mp4",
         cover: "cover.jpg",
       } as Record<string, string | undefined>;
@@ -165,6 +167,10 @@ export const downloadSong = (
 
     // run in parallel
     yield* Effect.all([coverEff, lyricsEff, videoEff], { concurrency: 3 });
+
+    onProgress?.(0.95);
+    yield* normalizeSongDirectory(songDir, dirName, params.targetPeakDb);
+    onProgress?.(1);
 
     return { dirName, songDir } as DownloadSongResult;
   });

@@ -4,7 +4,12 @@ import type { FC } from "react";
 import { formatLanguageLabel } from "../../api/usdb/languages.ts";
 import { useI18n } from "../../i18n/I18nProvider.tsx";
 
-export type FocusedField = "artist" | "title" | "language" | "settings";
+export type FocusedField =
+  | "artist"
+  | "title"
+  | "language"
+  | "normalize"
+  | "settings";
 
 export type SearchFormProps = {
   artist: string;
@@ -32,9 +37,11 @@ export const SearchForm: FC<SearchFormProps> = ({
   const hint =
     focusedField === "language"
       ? t("form.pressEnterLanguage")
-      : focusedField === "settings"
-        ? t("form.pressEnterSettings")
-        : t("form.pressEnterSearch");
+      : focusedField === "normalize"
+        ? t("form.pressEnterNormalize")
+        : focusedField === "settings"
+          ? t("form.pressEnterSettings")
+          : t("form.pressEnterSearch");
 
   return (
     <Box flexDirection="column" gap={1}>
@@ -88,6 +95,23 @@ export const SearchForm: FC<SearchFormProps> = ({
       </Box>
 
       <Box marginTop={2}>
+        <Text
+          color={focusedField === "normalize" ? "cyanBright" : "white"}
+          bold
+        >
+          {focusedField === "normalize"
+            ? `> ${t("form.normalizeVolumes")}`
+            : t("form.normalizeVolumes")}
+        </Text>
+        {focusedField === "normalize" && (
+          <Text dimColor>
+            {"  "}
+            {t("form.enterToSelect")}
+          </Text>
+        )}
+      </Box>
+
+      <Box>
         <Text color={focusedField === "settings" ? "cyanBright" : "white"} bold>
           {focusedField === "settings"
             ? `> ${t("form.settings")}`

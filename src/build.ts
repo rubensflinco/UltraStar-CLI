@@ -59,6 +59,7 @@ const result = await Bun.build({
   entrypoints: ["index.tsx"],
   outdir: "../build/dist",
   target: "node",
+  external: ["ffmpeg-static"],
   minify: {
     syntax: true,
     whitespace: true,
@@ -103,6 +104,9 @@ const packageJsonBuild = {
   homepage: packageJson.homepage,
   bin: {
     ultrastar: "./dist/index.js",
+  },
+  dependencies: {
+    "ffmpeg-static": "^5.3.0",
   },
 };
 

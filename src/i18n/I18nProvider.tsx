@@ -13,7 +13,7 @@ import type { AppLocaleCode } from "./locales.ts";
 
 type I18nContextValue = {
   locale: AppLocaleCode;
-  t: (key: string) => string;
+  t: (key: string, options?: Record<string, unknown>) => string;
   setLocale: (locale: AppLocaleCode) => Promise<void>;
 };
 
@@ -38,7 +38,8 @@ export const I18nProvider: FC<I18nProviderProps> = ({
   const value = useMemo<I18nContextValue>(
     () => ({
       locale,
-      t: (key: string) => i18n.t(key),
+      t: (key: string, options?: Record<string, unknown>) =>
+        i18n.t(key, options),
       setLocale,
     }),
     [locale, setLocale],

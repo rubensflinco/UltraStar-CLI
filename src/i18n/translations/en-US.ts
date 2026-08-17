@@ -22,12 +22,14 @@ export const enUS = {
     artist: "Artist:",
     title: "Title:",
     language: "Language:",
+    normalizeVolumes: "Balance volumes",
     settings: "Settings",
     artistPlaceholder: "e.g. Queen",
     titlePlaceholder: "e.g. Bohemian Rhapsody",
     enterToSelect: "(Enter to select)",
     pressEnterSearch: "Press Enter to search",
     pressEnterLanguage: "Press Enter to select language",
+    pressEnterNormalize: "Press Enter to balance all song volumes",
     pressEnterSettings: "Press Enter to open settings",
   },
   language: {
@@ -48,7 +50,25 @@ export const enUS = {
   settings: {
     title: "Settings",
     appLanguage: "App language:",
-    changeHint: "Press Enter to change language",
+    targetPeakDb: "Target peak:",
+    targetPeakDbPlaceholder: "e.g. -3",
+    targetPeakDbHint:
+      "Peak volume target in dB ({{min}} to {{max}}). Default is -3 (yellow meter zone).",
+    changeLanguageHint: "Press Enter to change language",
+    editPeakHint: "Edit the value, then press Enter to save",
+    backHint: "Tab: switch setting • Esc: save & go back",
+  },
+  normalize: {
+    title: "Balance volumes",
+    description:
+      "Creates audio.mp3 from each video.mp4 and peak-normalizes to {{peak}} dB (yellow meter zone). video.mp4 is left unchanged.",
+    pressEnter: "Press Enter to process all songs in the songs folder",
+    running: "Balancing volumes…",
+    noneFound: "No songs with video.mp4 found.",
+    done: "Volume balancing finished.",
+    succeeded: "Done:",
+    skipped: "Skipped:",
+    failed: "Failed:",
     backHint: "Press Esc to go back",
   },
   localeSetup: {
@@ -60,7 +80,8 @@ export const enUS = {
     form: "Tab: switch field • Enter: search / select • Esc: quit",
     language: "↑/↓: select • Enter: confirm • Esc: cancel",
     localeSetup: "↑/↓: select • Enter: confirm",
-    settings: "Enter: change language • Esc: back",
+    settings: "Tab: switch setting • Enter: edit / confirm • Esc: save & back",
+    normalize: "Enter: start • Esc: back",
     results:
       "↑/↓: select • Enter: download • ←/→: page • e: edit search • l: language • r: refresh • Esc: back",
     resultsNoDownload:
