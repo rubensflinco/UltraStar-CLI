@@ -63,7 +63,11 @@ export const extractNormalizedMp3 = (
   inputPath: string,
   outputMp3Path: string,
   targetPeakDb: number = DEFAULT_TARGET_PEAK_DB,
-): Effect.Effect<{ peakBeforeDb: number | null; gainDb: number }, Error, never> =>
+): Effect.Effect<
+  { peakBeforeDb: number | null; gainDb: number },
+  Error,
+  never
+> =>
   Effect.gen(function* () {
     const peakBeforeDb = yield* detectMaxVolumeDb(inputPath);
     const gainDb =
@@ -179,33 +183,38 @@ export const updateSongTxtMediaTags = (
   });
 
 /**
- * Normalize one song folder: video.mp4 → audio.mp3 (balanced), update song.txt.
+ * Normalize one song folder: source media → audio.mp3 (balanced), update song.txt.
+ * By default extracts from video.mp4. Pass audioSourcePath to use a different file
+ * (e.g. a YouTube source labeled AUDIO) while leaving the clip video untouched.
  */
 export const normalizeSongDirectory = (
   songDir: string,
   dirName?: string,
   targetPeakDb: number = DEFAULT_TARGET_PEAK_DB,
+  audioSourcePath?: string,
 ): Effect.Effect<NormalizeSongResult, Error, never> =>
   Effect.gen(function* () {
-    const name = dirName ?? songDir.split(/[/\\]/).filter(Boolean).at(-1) ?? songDir;
+    const name =
+      dirName ?? songDir.split(/[/\\]/).filter(Boolean).at(-1) ?? songDir;
     const videoPath = join(songDir, VIDEO_FILENAME);
     const audioPath = join(songDir, AUDIO_FILENAME);
+    const sourcePath = audioSourcePath ?? videoPath;
 
-    const hasVideo = yield* Effect.promise(() => fileExists(videoPath));
+    const hasSource = yield* Effect.promise(() => fileExists(sourcePath));
 
-    if (!hasVideo) {
+    if (!hasSource) {
       return {
         songDir,
         dirName: name,
         peakBeforeDb: null,
         gainDb: 0,
         skipped: true,
-        reason: "missing video.mp4",
+        reason: audioSourcePath ? "missing audio source" : "missing video.mp4",
       } satisfies NormalizeSongResult;
     }
 
     const { peakBeforeDb, gainDb } = yield* extractNormalizedMp3(
-      videoPath,
+      sourcePath,
       audioPath,
       targetPeakDb,
     );

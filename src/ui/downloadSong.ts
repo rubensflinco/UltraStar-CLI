@@ -1,12 +1,17 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Effect } from "effect";
 import { normalizeSongDirectory } from "../api/audio/normalize.ts";
 import { downloadCoverById } from "../api/usdb/cover.ts";
-import { getLyricsById } from "../api/usdb/lyrics.ts";
+import { getLyricsById, type ParsedLyrics } from "../api/usdb/lyrics.ts";
 import type { Song } from "../api/usdb/search.ts";
 import type { YoutubeLink } from "../api/usdb/youtube.ts";
-import { getYoutubeLinksById } from "../api/usdb/youtube.ts";
+import {
+  getYoutubeLinksById,
+  normalizeYoutubeLink,
+  parseVideoMetaResources,
+  selectDownloadSources,
+} from "../api/usdb/youtube.ts";
 import { downloadYoutubeVideoWithProgress } from "../api/youtube/download.ts";
 import type { YoutubeVideo } from "../api/youtube/search.ts";
 import { searchYoutubeVideos } from "../api/youtube/search.ts";
@@ -24,17 +29,14 @@ export type DownloadSongResult = {
   songDir: string;
 };
 
+const AUDIO_SOURCE_TMP = ".audio-source.tmp.mp4";
+
 const sanitizeForPath = (name: string) =>
   name
     .replace(/[\\/:"*?<>|]+/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\./g, "")
     .trim();
-
-const normalizeYoutubeLink = (videoLink: string): string =>
-  /^(https?:)?\/\//.test(videoLink)
-    ? videoLink
-    : `https://youtu.be/${videoLink}`;
 
 const uniqueLinks = (links: string[]): string[] => {
   const seen = new Set<string>();
@@ -48,11 +50,11 @@ const uniqueLinks = (links: string[]): string[] => {
   return result;
 };
 
-const downloadVideoFromLinks = (
+const downloadFromLinks = (
   links: string[],
   outputPath: string,
-  searchQuery: string,
-  onProgress?: (p: number) => void,
+  searchQuery: string | null,
+  onProgress?: (percent: number) => void,
 ): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const errors: string[] = [];
@@ -64,7 +66,7 @@ const downloadVideoFromLinks = (
         tried.add(link);
         const result = yield* Effect.either(
           downloadYoutubeVideoWithProgress(link, outputPath, (p) =>
-            onProgress?.(Math.min(0.92, p.percent ?? 0)),
+            onProgress?.(p.percent ?? 0),
           ),
         );
         if (result._tag === "Right") return true;
@@ -72,17 +74,19 @@ const downloadVideoFromLinks = (
         return false;
       });
 
-    for (const link of links) {
+    for (const link of uniqueLinks(links)) {
       if (yield* tryLink(link)) return;
     }
 
-    const searchResults = yield* Effect.catchAll(
-      searchYoutubeVideos(searchQuery),
-      () => Effect.succeed<YoutubeVideo[]>([]),
-    );
-    for (const video of searchResults) {
-      const link = normalizeYoutubeLink(video.url || video.id);
-      if (yield* tryLink(link)) return;
+    if (searchQuery) {
+      const searchResults = yield* Effect.catchAll(
+        searchYoutubeVideos(searchQuery),
+        () => Effect.succeed<YoutubeVideo[]>([]),
+      );
+      for (const video of searchResults) {
+        const link = normalizeYoutubeLink(video.url || video.id);
+        if (yield* tryLink(link)) return;
+      }
     }
 
     return yield* Effect.fail(
@@ -100,7 +104,6 @@ export const downloadSong = (
     const dirName = sanitizeForPath(`${song.artist} - ${song.title}`);
     const songDir = join(baseDir, dirName);
 
-    // ensure directories
     yield* Effect.tryPromise({
       try: async () => {
         await mkdir(baseDir, { recursive: true });
@@ -110,15 +113,24 @@ export const downloadSong = (
         e instanceof Error ? e : new Error("Failed to create directories"),
     });
 
-    const usdbLinks = yield* Effect.catchAll(
-      getYoutubeLinksById(song.apiId, cookie),
-      () => Effect.succeed<YoutubeLink[]>([]),
-    );
-    const videoLinks = uniqueLinks(
-      usdbLinks.map((item) => item.link).filter(Boolean),
+    const [usdbLinks, parsedLyrics] = yield* Effect.all(
+      [
+        Effect.catchAll(getYoutubeLinksById(song.apiId, cookie), () =>
+          Effect.succeed<YoutubeLink[]>([]),
+        ),
+        Effect.catchAll(getLyricsById(song.apiId, cookie), () =>
+          Effect.succeed<ParsedLyrics>(null),
+        ),
+      ],
+      { concurrency: 2 },
     );
 
-    // Parallel: cover, lyrics, and video download (with progress)
+    const meta = parseVideoMetaResources(parsedLyrics?.headers.video);
+    const sources = selectDownloadSources(usdbLinks, meta);
+    const searchQuery = `${song.artist} ${song.title}`;
+    const videoPath = join(songDir, "video.mp4");
+    const audioTmpPath = join(songDir, AUDIO_SOURCE_TMP);
+
     const coverEff = Effect.gen(function* () {
       const coverBytes = yield* Effect.catchAll(
         downloadCoverById(song.apiId, cookie),
@@ -136,10 +148,9 @@ export const downloadSong = (
     });
 
     const lyricsEff = Effect.gen(function* () {
-      const parsed = yield* getLyricsById(song.apiId, cookie);
-      if (!parsed) return;
+      if (!parsedLyrics) return;
       const headers = {
-        ...parsed.headers,
+        ...parsedLyrics.headers,
         mp3: "audio.mp3",
         video: "video.mp4",
         cover: "cover.jpg",
@@ -148,7 +159,7 @@ export const downloadSong = (
         .filter(([, v]) => v != null && String(v).trim().length > 0)
         .map(([k, v]) => `#${k.toUpperCase()}:${v}`)
         .join("\n");
-      const content = `${headerLines}\n${parsed.lyrics.trim()}\n`;
+      const content = `${headerLines}\n${parsedLyrics.lyrics.trim()}\n`;
       yield* Effect.tryPromise({
         try: async () => {
           await writeFile(join(songDir, "song.txt"), content);
@@ -158,18 +169,67 @@ export const downloadSong = (
       });
     });
 
-    const videoEff = downloadVideoFromLinks(
-      videoLinks,
-      join(songDir, "video.mp4"),
-      `${song.artist} ${song.title}`,
-      onProgress,
+    let videoProgress = 0;
+    let audioProgress = 0;
+    const emitProgress = () => {
+      if (!onProgress) return;
+      if (sources.separateAudio) {
+        onProgress(Math.min(0.92, videoProgress * 0.5 + audioProgress * 0.42));
+        return;
+      }
+      onProgress(Math.min(0.92, videoProgress));
+    };
+
+    const videoEff = downloadFromLinks(
+      sources.videoLinks,
+      videoPath,
+      searchQuery,
+      (percent) => {
+        videoProgress = percent;
+        emitProgress();
+      },
     );
 
-    // run in parallel
-    yield* Effect.all([coverEff, lyricsEff, videoEff], { concurrency: 3 });
+    const mediaEffs: Array<Effect.Effect<void, Error>> = [
+      coverEff,
+      lyricsEff,
+      videoEff,
+    ];
+
+    if (sources.separateAudio) {
+      mediaEffs.push(
+        Effect.catchAll(
+          downloadFromLinks(
+            sources.audioLinks,
+            audioTmpPath,
+            null,
+            (percent) => {
+              audioProgress = percent;
+              emitProgress();
+            },
+          ),
+          () => Effect.void,
+        ),
+      );
+    }
+
+    yield* Effect.all(mediaEffs, { concurrency: 4 });
 
     onProgress?.(0.95);
-    yield* normalizeSongDirectory(songDir, dirName, params.targetPeakDb);
+    const hasSeparateAudioFile = sources.separateAudio
+      ? yield* Effect.promise(() =>
+          access(audioTmpPath)
+            .then(() => true)
+            .catch(() => false),
+        )
+      : false;
+    yield* normalizeSongDirectory(
+      songDir,
+      dirName,
+      params.targetPeakDb,
+      hasSeparateAudioFile ? audioTmpPath : undefined,
+    );
+    yield* Effect.promise(() => unlink(audioTmpPath).catch(() => undefined));
     onProgress?.(1);
 
     return { dirName, songDir } as DownloadSongResult;
