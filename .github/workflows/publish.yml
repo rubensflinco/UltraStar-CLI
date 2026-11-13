@@ -1,4 +1,4 @@
-name: Release
+name: Publish
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: release-main
+  group: publish-main
   cancel-in-progress: false
 
 permissions:
@@ -18,15 +18,14 @@ env:
   BUN_VERSION: "1.2.19"
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'chore: release') }}
+    if: github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'chore: release')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Bun.js
         uses: oven-sh/setup-bun@v2
@@ -74,11 +73,11 @@ jobs:
       - name: Summary
         run: |
           VERSION="${{ steps.bump.outputs.version }}"
-          cat >> "$GITHUB_STEP_SUMMARY" << EOF
-          # UltraStar CLI Plus — release
-
-          - **Version**: \`v${VERSION}\`
-          - **npm**: https://www.npmjs.com/package/ultrastar-cli-plus
-          - **Install**: \`npx ultrastar-cli-plus\`
-          - **Release**: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}
-          EOF
+          {
+            echo "# UltraStar CLI Plus - release"
+            echo ""
+            echo "- **Version**: \`v${VERSION}\`"
+            echo "- **npm**: https://www.npmjs.com/package/ultrastar-cli-plus"
+            echo "- **Install**: \`npx ultrastar-cli-plus\`"
+            echo "- **Release**: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
+          } >> "$GITHUB_STEP_SUMMARY"
