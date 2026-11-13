@@ -1,6 +1,6 @@
 export const enUS = {
   app: {
-    title: "UltraStar CLI",
+    title: "UltraStar CLI Plus",
   },
   status: {
     login: "Login:",
@@ -72,7 +72,7 @@ export const enUS = {
     backHint: "Press Esc to go back",
   },
   localeSetup: {
-    title: "Welcome to UltraStar CLI",
+    title: "Welcome to UltraStar CLI Plus",
     subtitle: "Choose the language you want to use:",
   },
   help: {

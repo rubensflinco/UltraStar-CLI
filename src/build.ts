@@ -103,14 +103,15 @@ const packageJsonBuild = {
   license: packageJson.license,
   homepage: packageJson.homepage,
   bin: {
-    ultrastar: "./dist/index.js",
+    "ultrastar-plus": "./dist/index.js",
+    "ultrastar-cli-plus": "./dist/index.js",
   },
   dependencies: {
     "ffmpeg-static": "^5.3.0",
   },
 };
 
-await mkdir("../build", { recursive: true });
+await mkdir("../build", { recursive: true }).catch(() => undefined);
 await writeFile(
   "../build/package.json",
   JSON.stringify(packageJsonBuild, null, 2),

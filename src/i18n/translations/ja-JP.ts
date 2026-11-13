@@ -2,7 +2,7 @@ import type { TranslationSchema } from "./en-US.ts";
 
 export const jaJP: TranslationSchema = {
   app: {
-    title: "UltraStar CLI",
+    title: "UltraStar CLI Plus",
   },
   status: {
     login: "ログイン:",
@@ -74,7 +74,7 @@ export const jaJP: TranslationSchema = {
     backHint: "Escで戻る",
   },
   localeSetup: {
-    title: "UltraStar CLIへようこそ",
+    title: "UltraStar CLI Plusへようこそ",
     subtitle: "使用する言語を選択してください:",
   },
   help: {

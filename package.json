@@ -1,21 +1,23 @@
 {
-  "name": "ultrastar",
-  "description": "Download songs from UltraStar biggest database",
-  "version": "1.0.1",
+  "name": "ultrastar-cli-plus",
+  "description": "UltraStar CLI Plus — fork with language filter, native YouTube download, i18n, volume normalize and split audio/video",
+  "version": "1.1.0",
   "type": "module",
   "private": true,
   "keywords": [
     "ultrastar",
+    "ultrastar-cli-plus",
     "cli",
     "download",
-    "songs"
+    "songs",
+    "karaoke"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/martiinii/UltraScrap-cli"
+    "url": "https://github.com/rubensflinco/UltraStar-CLI"
   },
   "license": "MIT",
-  "homepage": "https://github.com/martiinii/UltraScrap-cli",
+  "homepage": "https://github.com/rubensflinco/UltraStar-CLI",
   "scripts": {
     "build": "bun run --cwd src build.ts",
     "start": "bun run src/index.tsx",

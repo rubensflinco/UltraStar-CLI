@@ -2,7 +2,7 @@ import type { TranslationSchema } from "./en-US.ts";
 
 export const ptBR: TranslationSchema = {
   app: {
-    title: "UltraStar CLI",
+    title: "UltraStar CLI Plus",
   },
   status: {
     login: "Login:",
@@ -74,7 +74,7 @@ export const ptBR: TranslationSchema = {
     backHint: "Pressione Esc para voltar",
   },
   localeSetup: {
-    title: "Bem-vindo ao UltraStar CLI",
+    title: "Bem-vindo ao UltraStar CLI Plus",
     subtitle: "Escolha o idioma que deseja usar:",
   },
   help: {

@@ -2,7 +2,7 @@ import type { TranslationSchema } from "./en-US.ts";
 
 export const zhCN: TranslationSchema = {
   app: {
-    title: "UltraStar CLI",
+    title: "UltraStar CLI Plus",
   },
   status: {
     login: "登录:",
@@ -74,7 +74,7 @@ export const zhCN: TranslationSchema = {
     backHint: "按 Esc 返回",
   },
   localeSetup: {
-    title: "欢迎使用 UltraStar CLI",
+    title: "欢迎使用 UltraStar CLI Plus",
     subtitle: "请选择您要使用的语言:",
   },
   help: {
